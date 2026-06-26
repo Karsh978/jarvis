@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "e7830187-1adb-470d-858e-927300624597"
+      }
+    },
+    "android": {
+      "package": "com.jarvis12.jarvisbackend"
+    }
+  }
+}
