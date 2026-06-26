@@ -20,7 +20,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // --- MONGOOSE MODELS ---
 const Chat = require('./models/Chat');
-const DailyBrief = require('./models/DailyBrief'); // Imported New Model
+const DailyBrief = require('./models/DailyBrief'); 
 
 // Knowledge Schema & Model Definition (Needed for note scanning)
 const KnowledgeSchema = new mongoose.Schema({
@@ -129,26 +129,6 @@ const deepSearch = async (query) => {
         return { rawSnippets: "Network link to global web is currently unstable, Sir.", topUrl: null };
     }
 };
-
-app.post('/api/upload-notes', upload.single('pdf'), async (req, res) => {
-    try {
-        const dataBuffer = fs.readFileSync(req.file.path);
-        const data = await pdf(dataBuffer);
-        
-        // PDF ka sara text Jarvis ke brain (DB) mein save karna
-        const newKnowledge = new Knowledge({
-            subject: req.body.subject,
-            topic: req.body.topic,
-            content: data.text
-        });
-        await newKnowledge.save();
-        fs.unlinkSync(req.file.path); // Cleanup
-
-        res.json({ reply: `Sir, I have absorbed the ${req.body.subject} notes. My knowledge base is updated.` });
-    } catch (err) {
-        res.status(500).json({ reply: "I couldn't process the document, Sir." });
-    }
-});
 
 // --- 🕵️ AGENTIC JOB & BRIEFING SUBSYSTEM ---
 
@@ -280,7 +260,12 @@ cron.schedule('0 7 * * *', async () => {
 
 // --- ⚡ CORE ROUTE ENDPOINTS ---
 
-// NEW CACHED DAILY BRIEF ENDPOINT FOR THE APP DASHBOARD
+// 🔥 ROOT HEARTBEAT ENDPOINT (Keeps Render instance active with 200 OK statuses)
+app.get('/', (req, res) => {
+    res.status(200).send("Jarvis Core Strategic Engine Online, Sir.");
+});
+
+// CACHED DAILY BRIEF ENDPOINT FOR THE APP DASHBOARD
 app.get('/api/daily-brief', async (req, res) => {
     try {
         const today = new Date().toLocaleDateString();
@@ -303,7 +288,13 @@ app.get('/api/daily-brief', async (req, res) => {
                 response_format: { type: "json_object" }
             });
 
-            const parsedBrief = JSON.parse(aiResponse.choices[0].message.content);
+            // Defensive JSON parse protection
+            let parsedBrief = { news: [], jobs: [] };
+            try {
+                parsedBrief = JSON.parse(aiResponse.choices[0].message.content);
+            } catch (jsonErr) {
+                console.error("⚠️ LLM JSON response malformed, fallback to empty states:", jsonErr.message);
+            }
 
             brief = new DailyBrief({
                 date: today,
@@ -317,6 +308,26 @@ app.get('/api/daily-brief', async (req, res) => {
     } catch (error) {
         console.error("❌ Daily Brief Route Error:", error);
         res.status(500).json({ error: "Could not retrieve daily intel, Sir." });
+    }
+});
+
+// Notes Absorption Engine
+app.post('/api/upload-notes', upload.single('pdf'), async (req, res) => {
+    try {
+        const dataBuffer = fs.readFileSync(req.file.path);
+        const data = await pdf(dataBuffer);
+        
+        const newKnowledge = new Knowledge({
+            subject: req.body.subject,
+            topic: req.body.topic,
+            content: data.text
+        });
+        await newKnowledge.save();
+        fs.unlinkSync(req.file.path); // Cleanup
+
+        res.json({ reply: `Sir, I have absorbed the ${req.body.subject} notes. My knowledge base is updated.` });
+    } catch (err) {
+        res.status(500).json({ reply: "I couldn't process the document, Sir." });
     }
 });
 
@@ -397,28 +408,25 @@ app.get('/api/morning-brief', async (req, res) => {
     }
 });
 
-// Database Sync
-// Database Sync (Render database connection optimized)
+// Database Connection Setup
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log("💾 MongoDB Connected Successfully to Production"))
     .catch(err => console.error("❌ MongoDB Connection Error:", err));
 
-    // 🔥 JARVIS SELF-WAKEUP SYSTEM
-// Yeh server ko har 10 minute mein ping karega taaki Render isse sula na de
-const SERVER_URL = "https://j-i-v-a-rnyg.onrender.com"; // Apna Render URL yahan likhein
+// 🔥 JARVIS SELF-WAKEUP HEARTBEAT
+const SERVER_URL = "https://j-i-v-a-rnyg.onrender.com"; 
 
 setInterval(async () => {
     try {
         await axios.get(SERVER_URL);
         console.log("⚡ Jarvis Heartbeat: Staying Awake...");
     } catch (error) {
-        console.error("Heartbeat error:", error.message);
+        console.error("Heartbeat telemetry warning:", error.message);
     }
-}, 10 * 60 * 1000); // Har 10 minute mein call karega
+}, 10 * 60 * 1000); // Trigger ping loop every 10 minutes
 
-// Render dynamically assigns a port via process.env.PORT
+// Application Startup Configuration
 const PORT = process.env.PORT || 5000;
-
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`⚡ Jarvis Strategic Engine Online on Port ${PORT}`);
 });
