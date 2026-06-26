@@ -414,7 +414,7 @@ mongoose.connect(process.env.MONGO_URI)
     .catch(err => console.error("❌ MongoDB Connection Error:", err));
 
 // 🔥 JARVIS SELF-WAKEUP HEARTBEAT
-const SERVER_URL = "https://j-i-v-a-rnyg.onrender.com"; 
+const SERVER_URL = "https://jarvis-iadb.onrender.com"; 
 
 setInterval(async () => {
     try {
